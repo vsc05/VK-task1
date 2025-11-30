@@ -1,0 +1,23 @@
+# Dockerfile.monitor
+FROM golang:1.21-alpine AS builder
+
+WORKDIR /app
+COPY monitor/main.go .
+
+RUN go build -o /app/monitor-check main.go
+
+FROM alpine:latest
+WORKDIR /root/
+COPY --from=builder /app/monitor-check .
+
+RUN apk update && \
+    # Устанавливаем Docker CLI 
+    apk add --no-cache docker && \
+    # Удаляем кэш
+    rm -rf /var/cache/apk/*
+
+COPY monitor/restart_app.sh /restart_app.sh
+RUN chmod +x /restart_app.sh
+
+# Запуск монитора
+CMD ["./monitor-check"]

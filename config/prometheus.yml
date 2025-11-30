@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: 'hello-world-app'
+    metrics_path: '/metrics' 
+    static_configs:
+      - targets: ['web-app:8080']

@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # 1. Веб-приложение
+  web-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    ports:
+      - "8080:8080"
+    environment:
+      # Параметризация
+      APP_PORT: 8080
+    # Автоматический перезапуск при сбоях
+    restart: always 
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    # Логирование (Docker собирает логи stdout/stderr)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # 2. Скрипт мониторинга
+  monitor-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    environment:
+      # Параметризация
+      APP_TARGET_HOST: web-app  # Используем имя сервиса
+      APP_TARGET_PORT: 8080
+      CHECK_INTERVAL: 5s       # Проверка каждые 5 секунд (N секунд)
+    # Используем volume для записи логов монитора на хост и монтирования Dicker Socket'а с хоста
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - monitor_logs:/var/log/
+    # Скрипт работает непрерывно, его не нужно перезапускать
+    restart: on-failure
+
+  # 3. Инструмент мониторинга (Prometheus)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    restart: always
+
+volumes:
+  monitor_logs:
